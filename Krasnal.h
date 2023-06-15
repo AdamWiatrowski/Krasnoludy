@@ -62,7 +62,6 @@ private:
     // muteksy
     std::mutex clockMutex;
     std::mutex queueMutex;
-    std::mutex relMutex;
 
     // watki
     std::thread reqThread;
