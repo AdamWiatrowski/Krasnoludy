@@ -50,6 +50,7 @@ void Krasnal::compareClock(const Data& data)
 
 void Krasnal::sortQueue() {
     
+    queueMutex.lock();
     std::sort(queue.begin(), queue.end(), [](const Data& a, const Data& b) {
         if (a.clock == b.clock) {
             return a.ID < b.ID;
@@ -72,6 +73,7 @@ void Krasnal::removeAndSortQueue(int id) {
         queue.erase(it);
         queueMutex.unlock();
         sortQueue();
+        queueMutex.unlock();
     }
 
     
@@ -79,20 +81,19 @@ void Krasnal::removeAndSortQueue(int id) {
 
 void Krasnal::addToQueue(const Data& data) {
 
-    std::cout << "[" << m_id << "] Dodaje do kolejki" << data.ID << ".\n";
+    std::cout << "[" << m_id << "] Dodaje do kolejki " << data.ID << ".\n";
 
     queueMutex.lock();
-    queue.push_back(data);
+    queue.emplace_back(data);
     queueMutex.unlock();
 
     sortQueue();
+    queueMutex.unlock();
 }
 
 void Krasnal::requestJob() {
 
     std::cout << "[" << m_id << "] Ubiegam sie o prace.\n";
-
-    updateClock();
 
     int data[2];
 
@@ -119,6 +120,7 @@ void Krasnal::waitForReplies(){
             MPI_Recv(&success, 1, MPI_INT, i, REPLY, MPI_COMM_WORLD, &status);
         }
     }
+    std::cout << "[" << m_id << "] Otrzymalem odpowiedzi.\n";
 }
 
 void Krasnal::receiveJob()
@@ -133,6 +135,7 @@ void Krasnal::waitForTurn() {
     std::cout << "[" << m_id << "] Czekam na prace.\n";
     while (true) {
         queueMutex.lock();
+        std::cout << queue.front().ID << "\n";
         if(!queue.empty() && queue.front().ID == m_id) {
             queueMutex.unlock();
             break;
@@ -178,7 +181,9 @@ void Krasnal::relFunction()
         updateClock();
         removeAndSortQueue(recv_ID);
 
-        relMutex.unlock();
+        queueMutex.unlock();
+
+        sleep(1);
     }
 }
 
@@ -195,17 +200,16 @@ void Krasnal::reqFunction()
 
         std::cout << "[" << m_id << "] Otrzymalem REQ od " << data[0] << ".\n";
 
-        Data recv_data;
-        recv_data.ID = data[0];
-        recv_data.clock = data[1];
+        Data recv_data{data[0], data[1]};
 
         addToQueue(recv_data);
         compareClock(recv_data);
-        
 
+        std::cout << "[" << m_id << "] Wysylam. \n";
 
         MPI_Send(&success, 1, MPI_INT, recv_data.ID, REPLY, MPI_COMM_WORLD);
         
+        sleep(1);
     }
 }
 
@@ -214,6 +218,7 @@ void Krasnal::mainActivity(){
     {
         sleepyDwarf();
         updateClock();
+
         requestJob();
 
         Data tempData{m_data.ID, m_data.clock};
@@ -230,9 +235,6 @@ void Krasnal::mainActivity(){
         sendRelease();
 
         removeAndSortQueue(m_data.ID);
-
-        receiveJob();
-
 
     }
     
