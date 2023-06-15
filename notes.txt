@@ -1,0 +1,8 @@
+mpic++ -o job Skansen.cpp Krasnal.cpp main.cpp 
+mpirun --oversubscribe -np 3 ./job
+3 = ilosc procesow.
+
+========================================
+Uruchomienie:
+	make
+	mpirun --oversubscribe -np 3 ./job
